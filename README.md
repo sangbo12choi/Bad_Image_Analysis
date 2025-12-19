@@ -470,3 +470,5 @@ python organize_images.py
 리팩토링 작업을 진행할 때 위 체크박스를 업데이트하여 진행 상황을 추적하세요.
 
 **참고**: 상세한 분석 내용은 [CODE_ANALYSIS_REPORT.md](CODE_ANALYSIS_REPORT.md) 파일을 참조하세요.
+
+## KPT 단계 시작!!!
