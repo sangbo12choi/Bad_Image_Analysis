@@ -387,17 +387,18 @@ python organize_images.py
   - `Image, ImageTk` from PIL (analyze_gui.py) - 이미 제거됨
 
 #### 3. 긴 메서드 분리
-- [ ] `display_image()` 메서드 분리 (110라인 → 3개 메서드로 분리)
-  - 이미지 렌더링 로직 분리
-  - 불량 그리기 로직 분리
-  - 라벨 표시 로직 분리
-- [ ] `classify_defect()` 메서드 분리 (87라인 → 3개 메서드로 분리)
-  - 속성 계산 로직 분리
-  - 유형 분류 로직 분리
-  - 심각도 분류 로직 분리
-- [ ] `reset_application()` 메서드 분리 (86라인 → 2개 메서드로 분리)
-  - 상태 초기화 로직 분리
-  - UI 초기화 로직 분리
+- [x] `display_image()` 메서드 분리 (110라인 → 4개 메서드로 분리)
+  - `_render_original_image()`: 원본 이미지 렌더링 로직 분리 완료
+  - `_draw_defects_on_image()`: 불량 그리기 로직 분리 완료 (바운딩 박스, 중심점)
+  - `_draw_defect_labels()`: 라벨 표시 로직 분리 완료
+  - 메인 메서드는 각 분리된 메서드를 호출하도록 리팩토링 완료
+- [x] `classify_defect()` 메서드 분리 (87라인 → 3개 메서드로 분리)
+  - `_calculate_defect_properties()`: 속성 계산 로직 분리 완료 (bbox, centroid, aspect_ratio, solidity 등)
+  - `_classify_defect_type_by_features()`: 유형 분류 로직 분리 완료 (is_scratch, is_crack, is_chipping 체크)
+  - `_classify_severity()`: 심각도 분류는 이미 분리되어 있음
+- [x] `reset_application()` 메서드 분리 (86라인 → 3개 메서드로 분리)
+  - `_reset_application_state()`: 상태 초기화 로직 분리 완료 (데이터, 설정 초기화)
+  - `_reset_application_ui()`: UI 초기화 로직 분리 완료 (위젯, 이미지, 통계, 리포트 초기화)
 
 ### 🟡 중간 우선순위 (Medium Priority)
 

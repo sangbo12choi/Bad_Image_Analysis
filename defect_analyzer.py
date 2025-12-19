@@ -276,6 +276,32 @@ class DefectAnalyzer:
             결함 분류 정보 딕셔너리
         """
         # 기본 속성 계산
+        properties = self._calculate_defect_properties(contour, image_shape)
+        if properties is None:
+            return None
+        
+        # 유형 분류
+        defect_type = self._classify_defect_type_by_features(properties, image_shape)
+        properties['defect_type'] = defect_type
+        
+        # 심각도 분류
+        severity = self._classify_severity(properties['area'], image_shape)
+        properties['severity'] = severity
+        
+        return properties
+    
+    def _calculate_defect_properties(self, contour: np.ndarray, image_shape: Tuple[int, int]) -> Optional[Dict]:
+        """
+        결함의 기본 속성 계산
+        
+        Args:
+            contour: 결함 윤곽선
+            image_shape: 이미지 크기 (height, width)
+            
+        Returns:
+            결함 속성 딕셔너리 또는 None
+        """
+        # 기본 속성 계산
         area = cv2.contourArea(contour)
         perimeter = cv2.arcLength(contour, True)
         
@@ -301,12 +327,6 @@ class DefectAnalyzer:
         hull_area = cv2.contourArea(hull)
         solidity = float(area) / hull_area if hull_area != 0 else 0
         
-        # 결함 유형 분류
-        defect_type = self._classify_defect_type(area, aspect_ratio, solidity, w, h)
-        
-        # 심각도 분류
-        severity = self._classify_severity(area, image_shape)
-        
         # 엣지 결함 여부 확인
         height, width = image_shape
         edge_threshold = 0.05  # 이미지 크기의 5% 이내면 엣지로 간주
@@ -314,6 +334,38 @@ class DefectAnalyzer:
                   x + w > width * (1 - edge_threshold) or
                   y < height * edge_threshold or 
                   y + h > height * (1 - edge_threshold))
+        
+        return {
+            'bbox': (x, y, w, h),
+            'area': area,
+            'centroid': (cx, cy),
+            'perimeter': perimeter,
+            'aspect_ratio': aspect_ratio,
+            'solidity': solidity,
+            'is_edge': is_edge
+        }
+    
+    def _classify_defect_type_by_features(self, properties: Dict, image_shape: Tuple[int, int]) -> str:
+        """
+        결함 속성을 기반으로 유형 분류
+        
+        Args:
+            properties: 결함 속성 딕셔너리
+            image_shape: 이미지 크기 (height, width)
+            
+        Returns:
+            결함 유형 문자열
+        """
+        x, y, w, h = properties['bbox']
+        area = properties['area']
+        solidity = properties['solidity']
+        aspect_ratio = properties['aspect_ratio']
+        perimeter = properties['perimeter']
+        is_edge = properties['is_edge']
+        height, width = image_shape
+        
+        # 기본 유형 분류
+        defect_type = self._classify_defect_type(area, aspect_ratio, solidity, w, h)
         
         # Scratch 여부 확인 (패널 표면 어디서나 발생하는 선형 긁힘)
         is_scratch = self._is_scratch_defect(
@@ -332,25 +384,15 @@ class DefectAnalyzer:
         
         # 불량 유형 분류 (Chipping, Crack, Scratch만)
         if is_scratch:
-            defect_type = 'scratch'
+            return 'scratch'
         elif is_crack:
-            defect_type = 'crack'
+            return 'crack'
         elif is_chipping:
-            defect_type = 'chipping'
+            return 'chipping'
         elif is_edge:
-            defect_type = 'edge'
+            return 'edge'
         
-        return {
-            'bbox': (x, y, w, h),
-            'area': area,
-            'centroid': (cx, cy),
-            'defect_type': defect_type,
-            'severity': severity,
-            'perimeter': perimeter,
-            'aspect_ratio': aspect_ratio,
-            'solidity': solidity,
-            'is_edge': is_edge
-        }
+        return defect_type
     
     def _is_chipping_defect(self, x: int, y: int, w: int, h: int, 
                            area: float, solidity: float, aspect_ratio: float,
