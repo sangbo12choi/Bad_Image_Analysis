@@ -264,40 +264,6 @@ class DefectAnalyzer:
         
         return scratch_mask
     
-    def detect_bubble(self, image: np.ndarray) -> np.ndarray:
-        """
-        Bubble 결함 감지 (원형 또는 타원형 형태의 기포)
-        
-        Args:
-            image: 전처리된 그레이스케일 이미지
-            
-        Returns:
-            Bubble 마스크
-        """
-        # Bubble은 밝은 영역이거나 어두운 영역일 수 있음
-        # 일반적으로 어두운 원형 구조로 나타남
-        mean_intensity = np.mean(image)
-        std_intensity = np.std(image)
-        
-        # 평균보다 어두운 영역 감지 (Bubble은 보통 어두움)
-        threshold_value = mean_intensity - 1.0 * std_intensity
-        threshold_value = max(0, min(threshold_value, 150))
-        
-        _, bubble_binary = cv2.threshold(image, threshold_value, 255, cv2.THRESH_BINARY_INV)
-        
-        # 원형 구조 강화 (Bubble은 원형이므로)
-        # 원형 커널 사용
-        kernel_circular = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-        
-        # 원형 구조 강조
-        bubble_mask = cv2.morphologyEx(bubble_binary, cv2.MORPH_CLOSE, kernel_circular, iterations=2)
-        
-        # 노이즈 제거
-        kernel = np.ones((3, 3), np.uint8)
-        bubble_mask = cv2.morphologyEx(bubble_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        
-        return bubble_mask
-    
     def classify_defect(self, contour: np.ndarray, image_shape: Tuple[int, int]) -> Dict:
         """
         결함을 분류 (크기, 형태, 위치 기반)
@@ -550,37 +516,6 @@ class DefectAnalyzer:
         # 외곽에서 시작하더라도, 너무 얇고 길면 Scratch일 수 있음
         # 하지만 우선순위는 Crack이므로 False 반환
         return False
-    
-    def _is_bubble_defect(self, x: int, y: int, w: int, h: int,
-                          area: float, solidity: float, aspect_ratio: float,
-                          img_width: int, img_height: int) -> bool:
-        """
-        Bubble 결함인지 판단
-        
-        Bubble 특징:
-        - 원형 또는 타원형 형태 (높은 solidity, 적당한 종횡비)
-        - 패널 표면 어디서나 발생 가능
-        - 적당한 크기
-        """
-        # Bubble 판단 조건
-        # 1. 원형 또는 타원형 형태 (높은 solidity)
-        # 2. 적당한 종횡비 (원형에 가까움, 0.5 ~ 2.0)
-        # 3. 적당한 크기
-        
-        # 원형 형태 확인 (높은 solidity)
-        if solidity < 0.85:  # 너무 불규칙하면 Bubble이 아님
-            return False
-        
-        # 종횡비 확인 (원형에 가까움)
-        # 원형은 종횡비가 1에 가까움, 타원형은 0.5 ~ 2.0 범위
-        if aspect_ratio < 0.5 or aspect_ratio > 2.0:
-            return False
-        
-        # 크기 범위 확인 (Bubble은 보통 중간 크기)
-        if area < 50 or area > 20000:  # Bubble 크기 범위
-            return False
-        
-        return True
     
     def _classify_defect_type(self, area: float, aspect_ratio: float, 
                               solidity: float, width: int, height: int) -> str:

@@ -378,11 +378,13 @@ python organize_images.py
   - `TEXT_ORIGINAL_IMAGE_PLACEHOLDER`, `TEXT_RESULT_IMAGE_PLACEHOLDER` 상수 정의 완료
 
 #### 2. 사용하지 않는 코드 제거
-- [ ] `detect_bubble()` 메서드 제거 (`defect_analyzer.py`)
-- [ ] `_is_bubble_defect()` 메서드 제거 (`defect_analyzer.py`)
-- [ ] 사용하지 않는 import 제거
-  - `sys` (analyze_gui.py:20)
-  - `Image, ImageTk` from PIL (analyze_gui.py:18)
+- [x] `detect_bubble()` 메서드 제거 (`defect_analyzer.py`)
+  - 사용되지 않는 메서드 제거 완료 (33라인 제거)
+- [x] `_is_bubble_defect()` 메서드 제거 (`defect_analyzer.py`)
+  - 사용되지 않는 메서드 제거 완료 (30라인 제거)
+- [x] 사용하지 않는 import 제거
+  - `sys` (analyze_gui.py) - 이미 제거됨
+  - `Image, ImageTk` from PIL (analyze_gui.py) - 이미 제거됨
 
 #### 3. 긴 메서드 분리
 - [ ] `display_image()` 메서드 분리 (110라인 → 3개 메서드로 분리)
