@@ -21,7 +21,7 @@ class Defect:
     bbox: Tuple[int, int, int, int]  # (x, y, width, height)
     area: float
     centroid: Tuple[float, float]
-    defect_type: str  # 'point', 'line', 'area', 'edge'
+    defect_type: str  # 'point', 'line', 'area', 'edge', 'chipping', 'crack', 'scratch'
     severity: str  # 'minor', 'moderate', 'severe'
     perimeter: float
     aspect_ratio: float
@@ -107,6 +107,152 @@ class DefectAnalyzer:
         
         return closed
     
+    def detect_chipping(self, image: np.ndarray) -> np.ndarray:
+        """
+        Chipping 결함 감지 (어두운 영역이 가장자리/모서리에 있는 경우)
+        
+        Args:
+            image: 전처리된 그레이스케일 이미지
+            
+        Returns:
+            Chipping 마스크
+        """
+        # Chipping은 어두운 영역이므로 낮은 임계값 사용
+        mean_intensity = np.mean(image)
+        std_intensity = np.std(image)
+        
+        # 평균보다 훨씬 어두운 영역 감지 (Chipping)
+        threshold_value = mean_intensity - 2 * std_intensity
+        threshold_value = max(0, min(threshold_value, 100))  # 0~100 범위로 제한
+        
+        _, chipping_binary = cv2.threshold(image, threshold_value, 255, cv2.THRESH_BINARY_INV)
+        
+        # 가장자리/모서리 영역 마스크 생성
+        height, width = image.shape
+        edge_mask = np.zeros((height, width), dtype=np.uint8)
+        
+        # 가장자리 영역 (이미지 크기의 10% 이내)
+        edge_threshold = 0.1
+        edge_mask[:int(height * edge_threshold), :] = 255  # 상단
+        edge_mask[int(height * (1 - edge_threshold)):, :] = 255  # 하단
+        edge_mask[:, :int(width * edge_threshold)] = 255  # 좌측
+        edge_mask[:, int(width * (1 - edge_threshold)):] = 255  # 우측
+        
+        # 모서리 영역 강조
+        corner_size = min(width, height) * 0.15
+        edge_mask[:int(corner_size), :int(corner_size)] = 255  # 좌상
+        edge_mask[:int(corner_size), int(width - corner_size):] = 255  # 우상
+        edge_mask[int(height - corner_size):, :int(corner_size)] = 255  # 좌하
+        edge_mask[int(height - corner_size):, int(width - corner_size):] = 255  # 우하
+        
+        # Chipping은 가장자리/모서리에 있는 어두운 영역
+        chipping_mask = cv2.bitwise_and(chipping_binary, edge_mask)
+        
+        # 형태학적 연산으로 정제
+        kernel = np.ones((5, 5), np.uint8)
+        chipping_mask = cv2.morphologyEx(chipping_mask, cv2.MORPH_CLOSE, kernel, iterations=2)
+        chipping_mask = cv2.morphologyEx(chipping_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        
+        return chipping_mask
+    
+    def detect_crack(self, image: np.ndarray) -> np.ndarray:
+        """
+        Crack 결함 감지 (외곽에서 시작하는 선형 균열)
+        
+        Args:
+            image: 전처리된 그레이스케일 이미지
+            
+        Returns:
+            Crack 마스크
+        """
+        # Crack은 어두운 선형 구조이므로 낮은 임계값 사용
+        mean_intensity = np.mean(image)
+        std_intensity = np.std(image)
+        
+        # 평균보다 훨씬 어두운 영역 감지
+        threshold_value = mean_intensity - 1.5 * std_intensity
+        threshold_value = max(0, min(threshold_value, 120))
+        
+        _, crack_binary = cv2.threshold(image, threshold_value, 255, cv2.THRESH_BINARY_INV)
+        
+        # 외곽 영역 마스크 생성 (이미지 크기의 5% 이내)
+        height, width = image.shape
+        edge_threshold = 0.05
+        edge_mask = np.zeros((height, width), dtype=np.uint8)
+        
+        # 외곽 영역만 마스크
+        edge_mask[:int(height * edge_threshold), :] = 255  # 상단
+        edge_mask[int(height * (1 - edge_threshold)):, :] = 255  # 하단
+        edge_mask[:, :int(width * edge_threshold)] = 255  # 좌측
+        edge_mask[:, int(width * (1 - edge_threshold)):] = 255  # 우측
+        
+        # 외곽에서 시작하는 어두운 영역만
+        crack_mask = cv2.bitwise_and(crack_binary, edge_mask)
+        
+        # 선형 구조 강화 (Crack은 선형이므로)
+        # 형태학적 연산: 선형 구조 강조
+        kernel_horizontal = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 1))
+        kernel_vertical = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 9))
+        kernel_diag1 = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        
+        # 다양한 방향의 선형 구조 감지
+        horizontal = cv2.morphologyEx(crack_mask, cv2.MORPH_CLOSE, kernel_horizontal)
+        vertical = cv2.morphologyEx(crack_mask, cv2.MORPH_CLOSE, kernel_vertical)
+        diagonal = cv2.morphologyEx(crack_mask, cv2.MORPH_CLOSE, kernel_diag1)
+        
+        # 결합
+        crack_mask = cv2.bitwise_or(crack_mask, horizontal)
+        crack_mask = cv2.bitwise_or(crack_mask, vertical)
+        crack_mask = cv2.bitwise_or(crack_mask, diagonal)
+        
+        # 노이즈 제거
+        kernel = np.ones((3, 3), np.uint8)
+        crack_mask = cv2.morphologyEx(crack_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        
+        return crack_mask
+    
+    def detect_scratch(self, image: np.ndarray) -> np.ndarray:
+        """
+        Scratch 결함 감지 (패널 표면 어디서나 발생하는 선형 긁힘)
+        
+        Args:
+            image: 전처리된 그레이스케일 이미지
+            
+        Returns:
+            Scratch 마스크
+        """
+        # Scratch는 어두운 선형 구조이므로 낮은 임계값 사용
+        mean_intensity = np.mean(image)
+        std_intensity = np.std(image)
+        
+        # 평균보다 어두운 영역 감지
+        threshold_value = mean_intensity - 1.5 * std_intensity
+        threshold_value = max(0, min(threshold_value, 120))
+        
+        _, scratch_binary = cv2.threshold(image, threshold_value, 255, cv2.THRESH_BINARY_INV)
+        
+        # 선형 구조 강화 (Scratch는 선형이므로)
+        # 다양한 방향의 선형 구조 감지
+        kernel_horizontal = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 1))
+        kernel_vertical = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 15))
+        kernel_diag1 = cv2.getStructuringElement(cv2.MORPH_RECT, (7, 7))
+        
+        # 다양한 방향의 선형 구조 감지
+        horizontal = cv2.morphologyEx(scratch_binary, cv2.MORPH_CLOSE, kernel_horizontal)
+        vertical = cv2.morphologyEx(scratch_binary, cv2.MORPH_CLOSE, kernel_vertical)
+        diagonal = cv2.morphologyEx(scratch_binary, cv2.MORPH_CLOSE, kernel_diag1)
+        
+        # 결합
+        scratch_mask = cv2.bitwise_or(scratch_binary, horizontal)
+        scratch_mask = cv2.bitwise_or(scratch_mask, vertical)
+        scratch_mask = cv2.bitwise_or(scratch_mask, diagonal)
+        
+        # 노이즈 제거
+        kernel = np.ones((3, 3), np.uint8)
+        scratch_mask = cv2.morphologyEx(scratch_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        
+        return scratch_mask
+    
     def classify_defect(self, contour: np.ndarray, image_shape: Tuple[int, int]) -> Dict:
         """
         결함을 분류 (크기, 형태, 위치 기반)
@@ -158,7 +304,28 @@ class DefectAnalyzer:
                   y < height * edge_threshold or 
                   y + h > height * (1 - edge_threshold))
         
-        if is_edge:
+        # Scratch 여부 확인 (패널 표면 어디서나 발생하는 선형 긁힘)
+        is_scratch = self._is_scratch_defect(
+            x, y, w, h, area, solidity, aspect_ratio, perimeter, width, height
+        )
+        
+        # Crack 여부 확인 (외곽에서 시작하는 선형 균열)
+        is_crack = self._is_crack_defect(
+            x, y, w, h, area, solidity, aspect_ratio, perimeter, width, height
+        )
+        
+        # Chipping 여부 확인 (가장자리/모서리에 있고, 불규칙한 형태)
+        is_chipping = self._is_chipping_defect(
+            x, y, w, h, area, solidity, aspect_ratio, width, height
+        )
+        
+        if is_scratch:
+            defect_type = 'scratch'
+        elif is_crack:
+            defect_type = 'crack'
+        elif is_chipping:
+            defect_type = 'chipping'
+        elif is_edge:
             defect_type = 'edge'
         
         return {
@@ -172,6 +339,171 @@ class DefectAnalyzer:
             'solidity': solidity,
             'is_edge': is_edge
         }
+    
+    def _is_chipping_defect(self, x: int, y: int, w: int, h: int, 
+                           area: float, solidity: float, aspect_ratio: float,
+                           img_width: int, img_height: int) -> bool:
+        """
+        Chipping 결함인지 판단
+        
+        Chipping 특징:
+        - 가장자리/모서리에 위치
+        - 불규칙한 형태 (낮은 solidity)
+        - 적당한 크기
+        """
+        # 가장자리/모서리 영역 확인
+        edge_threshold = 0.1  # 이미지 크기의 10% 이내
+        corner_threshold = 0.15  # 모서리 영역
+        
+        is_near_edge = (
+            x < img_width * edge_threshold or 
+            x + w > img_width * (1 - edge_threshold) or
+            y < img_height * edge_threshold or 
+            y + h > img_height * (1 - edge_threshold)
+        )
+        
+        # 모서리 영역 확인
+        is_corner = (
+            (x < img_width * corner_threshold and y < img_height * corner_threshold) or
+            (x + w > img_width * (1 - corner_threshold) and y < img_height * corner_threshold) or
+            (x < img_width * corner_threshold and y + h > img_height * (1 - corner_threshold)) or
+            (x + w > img_width * (1 - corner_threshold) and y + h > img_height * (1 - corner_threshold))
+        )
+        
+        # Chipping 판단 조건
+        # 1. 가장자리/모서리에 위치
+        # 2. 불규칙한 형태 (solidity < 0.85)
+        # 3. 적당한 크기 (100 ~ 50000 픽셀)
+        # 4. 종횡비가 극단적이지 않음 (0.1 ~ 10)
+        
+        if not is_near_edge:
+            return False
+        
+        if solidity > 0.85:  # 너무 규칙한 형태는 Chipping이 아님
+            return False
+        
+        if area < 100 or area > 50000:  # 크기 범위
+            return False
+        
+        if aspect_ratio < 0.1 or aspect_ratio > 10:  # 극단적인 종횡비는 제외
+            return False
+        
+        return True
+    
+    def _is_crack_defect(self, x: int, y: int, w: int, h: int,
+                         area: float, solidity: float, aspect_ratio: float,
+                         perimeter: float, img_width: int, img_height: int) -> bool:
+        """
+        Crack 결함인지 판단
+        
+        Crack 특징:
+        - 외곽(이미지 경계의 5% 이내)에서 시작
+        - 선형적인 형태 (매우 높은 종횡비 또는 매우 낮은 종횡비)
+        - 얇고 긴 형태
+        - 높은 perimeter/area 비율 (선형 구조)
+        """
+        # 외곽 영역 확인 (이미지 경계의 5% 이내)
+        edge_threshold = 0.05
+        
+        # 시작점이 외곽에 있는지 확인
+        start_near_edge = (
+            x < img_width * edge_threshold or
+            x + w > img_width * (1 - edge_threshold) or
+            y < img_height * edge_threshold or
+            y + h > img_height * (1 - edge_threshold)
+        )
+        
+        if not start_near_edge:
+            return False
+        
+        # Crack 판단 조건
+        # 1. 외곽에서 시작
+        # 2. 선형적인 형태 (종횡비가 매우 높거나 낮음)
+        # 3. 얇고 긴 형태 (높은 perimeter/area 비율)
+        # 4. 적당한 크기
+        
+        # 선형 구조 확인 (종횡비가 매우 높거나 낮음)
+        is_linear = aspect_ratio > 8 or aspect_ratio < 0.125
+        
+        if not is_linear:
+            return False
+        
+        # 선형 구조 비율 확인 (perimeter/area가 높으면 선형)
+        if area > 0:
+            linearity_ratio = perimeter * perimeter / area  # 선형 구조일수록 높음
+            # 선형 구조는 이 비율이 높음 (원형은 약 4π, 선형은 훨씬 높음)
+            if linearity_ratio < 20:  # 너무 낮으면 선형이 아님
+                return False
+        else:
+            return False
+        
+        # 크기 범위 확인
+        if area < 50 or area > 10000:  # Crack은 보통 중간 크기
+            return False
+        
+        # 너무 규칙한 형태는 제외 (Crack은 약간 불규칙함)
+        if solidity > 0.95:  # 너무 규칙하면 Crack이 아님
+            return False
+        
+        return True
+    
+    def _is_scratch_defect(self, x: int, y: int, w: int, h: int,
+                           area: float, solidity: float, aspect_ratio: float,
+                           perimeter: float, img_width: int, img_height: int) -> bool:
+        """
+        Scratch 결함인지 판단
+        
+        Scratch 특징:
+        - 패널 표면 어디서나 발생 가능 (외곽 제한 없음)
+        - 선형적인 형태 (매우 높은 종횡비 또는 매우 낮은 종횡비)
+        - 얇고 긴 형태
+        - 높은 perimeter/area 비율 (선형 구조)
+        """
+        # Scratch 판단 조건
+        # 1. 선형적인 형태 (종횡비가 매우 높거나 낮음)
+        # 2. 얇고 긴 형태 (높은 perimeter/area 비율)
+        # 3. 적당한 크기
+        
+        # 선형 구조 확인 (종횡비가 매우 높거나 낮음)
+        is_linear = aspect_ratio > 6 or aspect_ratio < 0.167
+        
+        if not is_linear:
+            return False
+        
+        # 선형 구조 비율 확인 (perimeter/area가 높으면 선형)
+        if area > 0:
+            linearity_ratio = perimeter * perimeter / area  # 선형 구조일수록 높음
+            # 선형 구조는 이 비율이 높음 (원형은 약 4π, 선형은 훨씬 높음)
+            if linearity_ratio < 15:  # 너무 낮으면 선형이 아님
+                return False
+        else:
+            return False
+        
+        # 크기 범위 확인 (Scratch는 보통 작고 얇음)
+        if area < 30 or area > 5000:  # Scratch는 보통 작은 편
+            return False
+        
+        # 너무 규칙한 형태는 제외 (Scratch는 약간 불규칙할 수 있음)
+        if solidity > 0.98:  # 너무 규칙하면 Scratch가 아님
+            return False
+        
+        # Crack과의 차별화: 외곽에서 시작하지 않으면 Scratch
+        edge_threshold = 0.05
+        start_near_edge = (
+            x < img_width * edge_threshold or
+            x + w > img_width * (1 - edge_threshold) or
+            y < img_height * edge_threshold or
+            y + h > img_height * (1 - edge_threshold)
+        )
+        
+        # 외곽에서 시작하지 않으면 Scratch로 분류
+        # (외곽에서 시작하면 Crack일 가능성이 높음)
+        if not start_near_edge:
+            return True
+        
+        # 외곽에서 시작하더라도, 너무 얇고 길면 Scratch일 수 있음
+        # 하지만 우선순위는 Crack이므로 False 반환
+        return False
     
     def _classify_defect_type(self, area: float, aspect_ratio: float, 
                               solidity: float, width: int, height: int) -> str:
@@ -224,11 +556,25 @@ class DefectAnalyzer:
         # 전처리
         processed = self.preprocess_image(image)
         
-        # 결함 감지
+        # 일반 결함 감지
         defect_mask = self.detect_defects(processed)
         
+        # Chipping 감지
+        chipping_mask = self.detect_chipping(processed)
+        
+        # Crack 감지
+        crack_mask = self.detect_crack(processed)
+        
+        # Scratch 감지
+        scratch_mask = self.detect_scratch(processed)
+        
+        # 모든 마스크 결합
+        combined_mask = cv2.bitwise_or(defect_mask, chipping_mask)
+        combined_mask = cv2.bitwise_or(combined_mask, crack_mask)
+        combined_mask = cv2.bitwise_or(combined_mask, scratch_mask)
+        
         # 윤곽선 찾기
-        contours, _ = cv2.findContours(defect_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         # 결함 분류
         defects = []
@@ -284,7 +630,10 @@ class DefectAnalyzer:
             'point': 'red',
             'line': 'blue',
             'area': 'yellow',
-            'edge': 'green'
+            'edge': 'green',
+            'chipping': 'magenta',  # Chipping은 자홍색으로 표시
+            'crack': 'cyan',  # Crack은 청록색으로 표시
+            'scratch': 'orange'  # Scratch는 주황색으로 표시
         }
         
         # 각 결함 표시
