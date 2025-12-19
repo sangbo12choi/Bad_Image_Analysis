@@ -19,11 +19,13 @@ Bad_Image_Analysis/
 ├── crack_generator.py         # Crack 이미지 생성기
 ├── scratch_generator.py        # Scratch 이미지 생성기
 ├── defect_analyzer.py         # 결함 분석 모듈
+├── analyze_gui.py             # GUI 프로그램 ⭐ (가장 쉬움)
+├── analyze_console.py         # 인터랙티브 콘솔 프로그램
+├── main.py                    # 기본 CLI 실행 스크립트
 ├── test_chipping_detection.py # Chipping 테스트
 ├── test_crack_detection.py    # Crack 테스트
 ├── test_scratch_detection.py  # Scratch 테스트
-├── run_scratch_detection.py   # Scratch 간단 실행 스크립트
-└── main.py                    # CLI 실행 스크립트
+└── run_scratch_detection.py   # Scratch 간단 실행 스크립트
 ```
 
 ## 주요 기능
@@ -57,7 +59,53 @@ pip install -r requirements.txt
 
 ## 실행 방법
 
-### 방법 1: CLI를 통한 실행 (권장)
+### 방법 1: GUI 프로그램 (가장 쉬움) ⭐⭐⭐
+
+마우스 클릭만으로 쉽게 사용할 수 있는 그래픽 인터페이스입니다.
+
+```bash
+python analyze_gui.py
+```
+
+#### 주요 기능
+- 🖱️ 마우스 클릭만으로 모든 기능 사용
+- 📋 직관적인 메뉴 인터페이스
+- 🔍 불량 유형별 선택 분석
+- 📊 실시간 결과 시각화 (이미지, 통계, 리포트)
+- 💾 원클릭 결과 저장
+
+자세한 사용법은 [GUI_USAGE.md](GUI_USAGE.md)를 참조하세요.
+
+### 방법 2: 인터랙티브 콘솔 프로그램 ⭐⭐
+
+불량 유형별로 선택하여 분석할 수 있는 인터랙티브 프로그램입니다.
+
+```bash
+python analyze_console.py
+```
+
+#### 주요 기능
+- 📋 메뉴 기반 인터페이스
+- 🔍 불량 유형별 선택 분석 (Chipping, Crack, Scratch, Bubble)
+- 📁 단일 이미지 및 배치 처리 지원
+- ⚙️ 분석 설정 변경 가능
+
+자세한 사용법은 [CONSOLE_USAGE.md](CONSOLE_USAGE.md)를 참조하세요.
+
+#### 빠른 시작 예시
+
+```bash
+# 인터랙티브 모드 실행
+python analyze_console.py
+
+# 명령줄에서 직접 실행 (Chipping만 분석)
+python analyze_console.py image.jpg -o results --type chipping
+
+# 배치 처리 (Crack만 분석)
+python analyze_console.py input_folder/ -o output/ --type crack
+```
+
+### 방법 2: 기본 CLI (main.py)
 
 #### 단일 이미지 분석
 

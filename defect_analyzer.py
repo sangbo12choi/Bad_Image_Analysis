@@ -353,19 +353,13 @@ class DefectAnalyzer:
             x, y, w, h, area, solidity, aspect_ratio, width, height
         )
         
-        # Bubble 여부 확인 (원형 또는 타원형 형태의 기포)
-        is_bubble = self._is_bubble_defect(
-            x, y, w, h, area, solidity, aspect_ratio, width, height
-        )
-        
+        # 불량 유형 분류 (Chipping, Crack, Scratch만)
         if is_scratch:
             defect_type = 'scratch'
         elif is_crack:
             defect_type = 'crack'
         elif is_chipping:
             defect_type = 'chipping'
-        elif is_bubble:
-            defect_type = 'bubble'
         elif is_edge:
             defect_type = 'edge'
         
@@ -705,8 +699,7 @@ class DefectAnalyzer:
             'edge': 'green',
             'chipping': 'magenta',  # Chipping은 자홍색으로 표시
             'crack': 'cyan',  # Crack은 청록색으로 표시
-            'scratch': 'orange',  # Scratch는 주황색으로 표시
-            'bubble': 'purple'  # Bubble은 보라색으로 표시
+            'scratch': 'orange'  # Scratch는 주황색으로 표시
         }
         
         # 각 결함 표시
