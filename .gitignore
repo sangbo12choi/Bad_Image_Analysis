@@ -40,6 +40,14 @@ output_results/
 generated_images/
 test_results/
 
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.json
+.pytest_cache/
+.tox/
+
 # Individual image files (backup - 위 폴더들이 이미 포함)
 *.jpg
 *.png
@@ -48,8 +56,3 @@ result.jpg
 report.csv
 *_result.jpg
 *_report.csv
-
-# Input images (optional - uncomment if you don't want to track sample images)
-# input_images/
-# sample_*.jpg
-
