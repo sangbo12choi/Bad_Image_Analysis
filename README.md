@@ -309,3 +309,5 @@ python organize_images.py
 `defect_analyzer.py`의 설정값을 조정하여 감지 민감도를 변경할 수 있습니다.
 
 ## RED단계 시작!!!
+
+## GREEN 단계 시작!!!
