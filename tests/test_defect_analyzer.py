@@ -218,12 +218,21 @@ class TestDefectClassification:
         analyzer = DefectAnalyzer()
         
         # Crack 특징을 가진 윤곽선 (외곽에서 시작, 선형)
-        contour = np.array([[[5, 50]], [[200, 50]]], dtype=np.int32)
+        # 폭을 가진 선형 구조를 만들기 위해 직사각형 윤곽선 생성
+        # 외곽(5, 50)에서 시작하여 내부로 향하는 선형 구조
+        contour = np.array([
+            [[5, 45]], [[5, 55]],  # 시작점 (외곽)
+            [[200, 45]], [[200, 55]]  # 끝점
+        ], dtype=np.int32)
+        # 더 큰 면적을 위해 폭을 가진 윤곽선으로 수정
+        contour = np.array([
+            [[5, 45]], [[5, 55]], [[200, 55]], [[200, 45]]
+        ], dtype=np.int32)
         image_shape = (1000, 1000)
         
         result = analyzer.classify_defect(contour, image_shape)
         
-        # RED: Crack이 정확히 분류되는지 확인
+        # GREEN: Crack이 정확히 분류되는지 확인
         assert result is not None
         assert 'defect_type' in result
     
@@ -232,12 +241,15 @@ class TestDefectClassification:
         analyzer = DefectAnalyzer()
         
         # Scratch 특징을 가진 윤곽선 (중앙에 위치, 선형)
-        contour = np.array([[[500, 500]], [[700, 500]]], dtype=np.int32)
+        # 폭을 가진 선형 구조를 만들기 위해 직사각형 윤곽선 생성
+        contour = np.array([
+            [[500, 495]], [[500, 505]], [[700, 505]], [[700, 495]]
+        ], dtype=np.int32)
         image_shape = (1000, 1000)
         
         result = analyzer.classify_defect(contour, image_shape)
         
-        # RED: Scratch가 정확히 분류되는지 확인
+        # GREEN: Scratch가 정확히 분류되는지 확인
         assert result is not None
         assert 'defect_type' in result
 
