@@ -367,13 +367,15 @@ python organize_images.py
 ### 🔴 높은 우선순위 (High Priority)
 
 #### 1. 중복 코드 제거
-- [ ] KOREAN_FONT_PROP 체크 헬퍼 메서드 생성
+- [x] KOREAN_FONT_PROP 체크 헬퍼 메서드 생성
   - `analyze_gui.py`에서 10회 이상 반복되는 폰트 체크 로직 통합
-  - `_add_text_with_font()` 같은 헬퍼 메서드 생성
-- [ ] 색상 맵 상수화
+  - `_add_text_with_font()`, `_set_title_with_font()`, `_set_label_with_font()` 헬퍼 메서드 생성 완료
+- [x] 색상 맵 상수화
   - `display_image()`, `create_highlighted_image()`, `visualize_results()`에서 중복 정의된 색상 맵을 상수로 통합
-- [ ] 이미지 초기화 텍스트 상수화
+  - `DEFECT_COLOR_MAP`, `DEFECT_COLOR_MAP_RGB` 상수 정의 완료
+- [x] 이미지 초기화 텍스트 상수화
   - "원본 이미지\n(이미지를 선택하세요)", "분석 결과\n(분석을 실행하세요)" 텍스트를 상수로 정의
+  - `TEXT_ORIGINAL_IMAGE_PLACEHOLDER`, `TEXT_RESULT_IMAGE_PLACEHOLDER` 상수 정의 완료
 
 #### 2. 사용하지 않는 코드 제거
 - [ ] `detect_bubble()` 메서드 제거 (`defect_analyzer.py`)

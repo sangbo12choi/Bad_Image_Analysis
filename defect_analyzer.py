@@ -13,6 +13,17 @@ import matplotlib.patches as patches
 from scipy import ndimage
 from skimage import morphology, measure, filters
 
+# 색상 맵 상수 (matplotlib 색상)
+DEFECT_COLOR_MAP = {
+    'point': 'red',
+    'line': 'blue',
+    'area': 'yellow',
+    'edge': 'green',
+    'chipping': 'magenta',  # Chipping은 자홍색으로 표시
+    'crack': 'cyan',  # Crack은 청록색으로 표시
+    'scratch': 'orange'  # Scratch는 주황색으로 표시
+}
+
 
 @dataclass
 class Defect:
@@ -691,21 +702,10 @@ class DefectAnalyzer:
         fig, ax = plt.subplots(1, 1, figsize=(12, 8))
         ax.imshow(image_rgb)
         
-        # 결함 유형별 색상
-        color_map = {
-            'point': 'red',
-            'line': 'blue',
-            'area': 'yellow',
-            'edge': 'green',
-            'chipping': 'magenta',  # Chipping은 자홍색으로 표시
-            'crack': 'cyan',  # Crack은 청록색으로 표시
-            'scratch': 'orange'  # Scratch는 주황색으로 표시
-        }
-        
         # 각 결함 표시
         for defect in defects:
             x, y, w, h = defect.bbox
-            color = color_map.get(defect.defect_type, 'red')
+            color = DEFECT_COLOR_MAP.get(defect.defect_type, 'red')
             
             # 바운딩 박스 그리기
             rect = patches.Rectangle((x, y), w, h, linewidth=2, 
