@@ -17,6 +17,10 @@ def example_single_image():
     )
     
     # 이미지 분석
+    from pathlib import Path
+    output_dir = Path('output')
+    output_dir.mkdir(exist_ok=True)
+    
     image_path = 'sample_panel.jpg'  # 실제 이미지 경로로 변경하세요
     try:
         defects = analyzer.analyze_image(image_path)
@@ -25,12 +29,12 @@ def example_single_image():
         analyzer.visualize_results(
             image_path, 
             defects,
-            save_path='result.jpg',
+            save_path=str(output_dir / 'result.jpg'),
             show=True
         )
         
         # 리포트 생성
-        analyzer.generate_report(defects, 'report.csv')
+        analyzer.generate_report(defects, str(output_dir / 'report.csv'))
         
         print(f"\n감지된 결함 수: {len(defects)}")
         for i, defect in enumerate(defects, 1):

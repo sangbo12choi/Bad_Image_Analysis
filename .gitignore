@@ -35,11 +35,19 @@ env/
 # Output files
 output/
 output_results/
+
+# Generated images and test results
+generated_images/
+test_results/
+
+# Individual image files (backup - 위 폴더들이 이미 포함)
 *.jpg
 *.png
 *.csv
 result.jpg
 report.csv
+*_result.jpg
+*_report.csv
 
 # Input images (optional - uncomment if you don't want to track sample images)
 # input_images/
