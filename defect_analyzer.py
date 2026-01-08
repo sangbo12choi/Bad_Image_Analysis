@@ -13,6 +13,17 @@ import matplotlib.patches as patches
 from scipy import ndimage
 from skimage import morphology, measure, filters
 
+# 색상 맵 상수 (matplotlib 색상)
+DEFECT_COLOR_MAP = {
+    'point': 'red',
+    'line': 'blue',
+    'area': 'yellow',
+    'edge': 'green',
+    'chipping': 'magenta',  # Chipping은 자홍색으로 표시
+    'crack': 'cyan',  # Crack은 청록색으로 표시
+    'scratch': 'orange'  # Scratch는 주황색으로 표시
+}
+
 
 @dataclass
 class Defect:
@@ -253,40 +264,6 @@ class DefectAnalyzer:
         
         return scratch_mask
     
-    def detect_bubble(self, image: np.ndarray) -> np.ndarray:
-        """
-        Bubble 결함 감지 (원형 또는 타원형 형태의 기포)
-        
-        Args:
-            image: 전처리된 그레이스케일 이미지
-            
-        Returns:
-            Bubble 마스크
-        """
-        # Bubble은 밝은 영역이거나 어두운 영역일 수 있음
-        # 일반적으로 어두운 원형 구조로 나타남
-        mean_intensity = np.mean(image)
-        std_intensity = np.std(image)
-        
-        # 평균보다 어두운 영역 감지 (Bubble은 보통 어두움)
-        threshold_value = mean_intensity - 1.0 * std_intensity
-        threshold_value = max(0, min(threshold_value, 150))
-        
-        _, bubble_binary = cv2.threshold(image, threshold_value, 255, cv2.THRESH_BINARY_INV)
-        
-        # 원형 구조 강화 (Bubble은 원형이므로)
-        # 원형 커널 사용
-        kernel_circular = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
-        
-        # 원형 구조 강조
-        bubble_mask = cv2.morphologyEx(bubble_binary, cv2.MORPH_CLOSE, kernel_circular, iterations=2)
-        
-        # 노이즈 제거
-        kernel = np.ones((3, 3), np.uint8)
-        bubble_mask = cv2.morphologyEx(bubble_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        
-        return bubble_mask
-    
     def classify_defect(self, contour: np.ndarray, image_shape: Tuple[int, int]) -> Dict:
         """
         결함을 분류 (크기, 형태, 위치 기반)
@@ -297,6 +274,32 @@ class DefectAnalyzer:
             
         Returns:
             결함 분류 정보 딕셔너리
+        """
+        # 기본 속성 계산
+        properties = self._calculate_defect_properties(contour, image_shape)
+        if properties is None:
+            return None
+        
+        # 유형 분류
+        defect_type = self._classify_defect_type_by_features(properties, image_shape)
+        properties['defect_type'] = defect_type
+        
+        # 심각도 분류
+        severity = self._classify_severity(properties['area'], image_shape)
+        properties['severity'] = severity
+        
+        return properties
+    
+    def _calculate_defect_properties(self, contour: np.ndarray, image_shape: Tuple[int, int]) -> Optional[Dict]:
+        """
+        결함의 기본 속성 계산
+        
+        Args:
+            contour: 결함 윤곽선
+            image_shape: 이미지 크기 (height, width)
+            
+        Returns:
+            결함 속성 딕셔너리 또는 None
         """
         # 기본 속성 계산
         area = cv2.contourArea(contour)
@@ -324,12 +327,6 @@ class DefectAnalyzer:
         hull_area = cv2.contourArea(hull)
         solidity = float(area) / hull_area if hull_area != 0 else 0
         
-        # 결함 유형 분류
-        defect_type = self._classify_defect_type(area, aspect_ratio, solidity, w, h)
-        
-        # 심각도 분류
-        severity = self._classify_severity(area, image_shape)
-        
         # 엣지 결함 여부 확인
         height, width = image_shape
         edge_threshold = 0.05  # 이미지 크기의 5% 이내면 엣지로 간주
@@ -337,6 +334,38 @@ class DefectAnalyzer:
                   x + w > width * (1 - edge_threshold) or
                   y < height * edge_threshold or 
                   y + h > height * (1 - edge_threshold))
+        
+        return {
+            'bbox': (x, y, w, h),
+            'area': area,
+            'centroid': (cx, cy),
+            'perimeter': perimeter,
+            'aspect_ratio': aspect_ratio,
+            'solidity': solidity,
+            'is_edge': is_edge
+        }
+    
+    def _classify_defect_type_by_features(self, properties: Dict, image_shape: Tuple[int, int]) -> str:
+        """
+        결함 속성을 기반으로 유형 분류
+        
+        Args:
+            properties: 결함 속성 딕셔너리
+            image_shape: 이미지 크기 (height, width)
+            
+        Returns:
+            결함 유형 문자열
+        """
+        x, y, w, h = properties['bbox']
+        area = properties['area']
+        solidity = properties['solidity']
+        aspect_ratio = properties['aspect_ratio']
+        perimeter = properties['perimeter']
+        is_edge = properties['is_edge']
+        height, width = image_shape
+        
+        # 기본 유형 분류
+        defect_type = self._classify_defect_type(area, aspect_ratio, solidity, w, h)
         
         # Scratch 여부 확인 (패널 표면 어디서나 발생하는 선형 긁힘)
         is_scratch = self._is_scratch_defect(
@@ -355,25 +384,15 @@ class DefectAnalyzer:
         
         # 불량 유형 분류 (Chipping, Crack, Scratch만)
         if is_scratch:
-            defect_type = 'scratch'
+            return 'scratch'
         elif is_crack:
-            defect_type = 'crack'
+            return 'crack'
         elif is_chipping:
-            defect_type = 'chipping'
+            return 'chipping'
         elif is_edge:
-            defect_type = 'edge'
+            return 'edge'
         
-        return {
-            'bbox': (x, y, w, h),
-            'area': area,
-            'centroid': (cx, cy),
-            'defect_type': defect_type,
-            'severity': severity,
-            'perimeter': perimeter,
-            'aspect_ratio': aspect_ratio,
-            'solidity': solidity,
-            'is_edge': is_edge
-        }
+        return defect_type
     
     def _is_chipping_defect(self, x: int, y: int, w: int, h: int, 
                            area: float, solidity: float, aspect_ratio: float,
@@ -540,37 +559,6 @@ class DefectAnalyzer:
         # 하지만 우선순위는 Crack이므로 False 반환
         return False
     
-    def _is_bubble_defect(self, x: int, y: int, w: int, h: int,
-                          area: float, solidity: float, aspect_ratio: float,
-                          img_width: int, img_height: int) -> bool:
-        """
-        Bubble 결함인지 판단
-        
-        Bubble 특징:
-        - 원형 또는 타원형 형태 (높은 solidity, 적당한 종횡비)
-        - 패널 표면 어디서나 발생 가능
-        - 적당한 크기
-        """
-        # Bubble 판단 조건
-        # 1. 원형 또는 타원형 형태 (높은 solidity)
-        # 2. 적당한 종횡비 (원형에 가까움, 0.5 ~ 2.0)
-        # 3. 적당한 크기
-        
-        # 원형 형태 확인 (높은 solidity)
-        if solidity < 0.85:  # 너무 불규칙하면 Bubble이 아님
-            return False
-        
-        # 종횡비 확인 (원형에 가까움)
-        # 원형은 종횡비가 1에 가까움, 타원형은 0.5 ~ 2.0 범위
-        if aspect_ratio < 0.5 or aspect_ratio > 2.0:
-            return False
-        
-        # 크기 범위 확인 (Bubble은 보통 중간 크기)
-        if area < 50 or area > 20000:  # Bubble 크기 범위
-            return False
-        
-        return True
-    
     def _classify_defect_type(self, area: float, aspect_ratio: float, 
                               solidity: float, width: int, height: int) -> str:
         """결함 유형 분류"""
@@ -691,21 +679,10 @@ class DefectAnalyzer:
         fig, ax = plt.subplots(1, 1, figsize=(12, 8))
         ax.imshow(image_rgb)
         
-        # 결함 유형별 색상
-        color_map = {
-            'point': 'red',
-            'line': 'blue',
-            'area': 'yellow',
-            'edge': 'green',
-            'chipping': 'magenta',  # Chipping은 자홍색으로 표시
-            'crack': 'cyan',  # Crack은 청록색으로 표시
-            'scratch': 'orange'  # Scratch는 주황색으로 표시
-        }
-        
         # 각 결함 표시
         for defect in defects:
             x, y, w, h = defect.bbox
-            color = color_map.get(defect.defect_type, 'red')
+            color = DEFECT_COLOR_MAP.get(defect.defect_type, 'red')
             
             # 바운딩 박스 그리기
             rect = patches.Rectangle((x, y), w, h, linewidth=2, 

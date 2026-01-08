@@ -359,3 +359,114 @@ python organize_images.py
 ## RED단계 시작!!!
 
 ## GREEN 단계 시작!!!
+
+## 리팩토링 목록
+
+코드 품질 개선을 위한 리팩토링 작업 목록입니다. 상세 분석은 [CODE_ANALYSIS_REPORT.md](CODE_ANALYSIS_REPORT.md)를 참조하세요.
+
+### 🔴 높은 우선순위 (High Priority)
+
+#### 1. 중복 코드 제거
+- [x] KOREAN_FONT_PROP 체크 헬퍼 메서드 생성
+  - `analyze_gui.py`에서 10회 이상 반복되는 폰트 체크 로직 통합
+  - `_add_text_with_font()`, `_set_title_with_font()`, `_set_label_with_font()` 헬퍼 메서드 생성 완료
+- [x] 색상 맵 상수화
+  - `display_image()`, `create_highlighted_image()`, `visualize_results()`에서 중복 정의된 색상 맵을 상수로 통합
+  - `DEFECT_COLOR_MAP`, `DEFECT_COLOR_MAP_RGB` 상수 정의 완료
+- [x] 이미지 초기화 텍스트 상수화
+  - "원본 이미지\n(이미지를 선택하세요)", "분석 결과\n(분석을 실행하세요)" 텍스트를 상수로 정의
+  - `TEXT_ORIGINAL_IMAGE_PLACEHOLDER`, `TEXT_RESULT_IMAGE_PLACEHOLDER` 상수 정의 완료
+
+#### 2. 사용하지 않는 코드 제거
+- [x] `detect_bubble()` 메서드 제거 (`defect_analyzer.py`)
+  - 사용되지 않는 메서드 제거 완료 (33라인 제거)
+- [x] `_is_bubble_defect()` 메서드 제거 (`defect_analyzer.py`)
+  - 사용되지 않는 메서드 제거 완료 (30라인 제거)
+- [x] 사용하지 않는 import 제거
+  - `sys` (analyze_gui.py) - 이미 제거됨
+  - `Image, ImageTk` from PIL (analyze_gui.py) - 이미 제거됨
+
+#### 3. 긴 메서드 분리
+- [x] `display_image()` 메서드 분리 (110라인 → 4개 메서드로 분리)
+  - `_render_original_image()`: 원본 이미지 렌더링 로직 분리 완료
+  - `_draw_defects_on_image()`: 불량 그리기 로직 분리 완료 (바운딩 박스, 중심점)
+  - `_draw_defect_labels()`: 라벨 표시 로직 분리 완료
+  - 메인 메서드는 각 분리된 메서드를 호출하도록 리팩토링 완료
+- [x] `classify_defect()` 메서드 분리 (87라인 → 3개 메서드로 분리)
+  - `_calculate_defect_properties()`: 속성 계산 로직 분리 완료 (bbox, centroid, aspect_ratio, solidity 등)
+  - `_classify_defect_type_by_features()`: 유형 분류 로직 분리 완료 (is_scratch, is_crack, is_chipping 체크)
+  - `_classify_severity()`: 심각도 분류는 이미 분리되어 있음
+- [x] `reset_application()` 메서드 분리 (86라인 → 3개 메서드로 분리)
+  - `_reset_application_state()`: 상태 초기화 로직 분리 완료 (데이터, 설정 초기화)
+  - `_reset_application_ui()`: UI 초기화 로직 분리 완료 (위젯, 이미지, 통계, 리포트 초기화)
+
+### 🟡 중간 우선순위 (Medium Priority)
+
+#### 4. 단일 책임 원칙 (SRP) 개선
+- [ ] DefectAnalysisGUI 클래스 분리
+  - UI 컴포넌트별로 분리 (ImageDisplay, StatisticsDisplay, ReportDisplay)
+  - 비즈니스 로직 분리 (AnalysisController)
+- [ ] DefectAnalyzer 클래스 분리
+  - 전처리기 분리 (ImagePreprocessor)
+  - 감지기 분리 (DefectDetector)
+  - 분류기 분리 (DefectClassifier)
+  - 시각화 분리 (ResultVisualizer)
+
+#### 5. 개방-폐쇄 원칙 (OCP) 개선
+- [ ] 전략 패턴 도입
+  - DefectDetectionStrategy 인터페이스 생성
+  - ThresholdStrategy 인터페이스 생성
+- [ ] 팩토리 패턴 도입
+  - DefectClassifierFactory 생성
+  - 불량 유형 추가 시 기존 코드 수정 없이 확장 가능하도록
+
+#### 6. 매직 넘버 상수화
+- [ ] 임계값 상수 정의
+  - `EDGE_THRESHOLD = 0.1`
+  - `CORNER_THRESHOLD = 0.15`
+  - `CHIPPING_THRESHOLD_MULTIPLIER = 2.0`
+- [ ] 크기 범위 상수 정의
+  - `CHIPPING_MIN_AREA = 100`, `CHIPPING_MAX_AREA = 50000`
+  - `CRACK_MIN_AREA = 50`, `CRACK_MAX_AREA = 10000`
+  - `SCRATCH_MIN_AREA = 30`, `SCRATCH_MAX_AREA = 5000`
+
+#### 7. 긴 매개변수 목록 개선
+- [ ] DefectProperties 데이터 클래스 생성
+  - `_is_chipping_defect()`, `_is_crack_defect()`, `_is_scratch_defect()` 메서드의 매개변수 통합
+- [ ] 기본 타입 집착 개선
+  - 불량 유형을 Enum으로 변경 (`DefectType` enum)
+  - 심각도를 Enum으로 변경 (`Severity` enum)
+
+### 🟢 낮은 우선순위 (Low Priority)
+
+#### 8. 의존성 역전 원칙 (DIP) 개선
+- [ ] 인터페이스 도입
+  - `IDefectAnalyzer` 인터페이스 생성
+  - 추상화를 통한 의존성 역전
+- [ ] 의존성 주입 도입
+  - `DefectAnalysisGUI`에서 `DefectAnalyzer` 직접 생성 대신 주입받도록 변경
+
+#### 9. 로깅 시스템 도입
+- [ ] print 문을 logging으로 교체
+  - `logging` 모듈 사용
+  - 로그 레벨 설정 (DEBUG, INFO, WARNING, ERROR)
+  - 프로덕션 환경에 적합한 로깅
+
+#### 10. 테스트 가능성 개선
+- [ ] 비즈니스 로직과 GUI 분리
+  - MVC 또는 MVP 패턴 적용
+- [ ] 전역 상태 제거
+  - `KOREAN_FONT_PROP` 전역 변수를 의존성 주입으로 변경
+  - 테스트 격리 가능하도록 개선
+
+#### 11. 성능 최적화
+- [ ] 이미지 캐싱
+  - 이미지 재로드 방지를 위한 캐싱 메커니즘 도입
+- [ ] 메모리 관리
+  - 큰 이미지 처리 시 메모리 이슈 해결
+
+### 진행 상황 추적
+
+리팩토링 작업을 진행할 때 위 체크박스를 업데이트하여 진행 상황을 추적하세요.
+
+**참고**: 상세한 분석 내용은 [CODE_ANALYSIS_REPORT.md](CODE_ANALYSIS_REPORT.md) 파일을 참조하세요.

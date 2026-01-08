@@ -15,9 +15,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import matplotlib.font_manager as fm
 import numpy as np
-from PIL import Image, ImageTk
 import cv2
-import sys
 import platform
 
 from defect_analyzer import DefectAnalyzer, Defect
@@ -95,6 +93,33 @@ def setup_korean_font():
 # 프로그램 시작 시 한글 폰트 설정
 KOREAN_FONT_PROP = setup_korean_font()
 
+# 상수 정의
+# 색상 맵 (matplotlib 색상)
+DEFECT_COLOR_MAP = {
+    'chipping': 'magenta',
+    'crack': 'cyan',
+    'scratch': 'orange',
+    'point': 'red',
+    'line': 'blue',
+    'area': 'yellow',
+    'edge': 'green'
+}
+
+# 색상 맵 (RGB 튜플)
+DEFECT_COLOR_MAP_RGB = {
+    'chipping': (255, 0, 255),    # magenta
+    'crack': (0, 255, 255),       # cyan
+    'scratch': (255, 165, 0),     # orange
+    'point': (255, 0, 0),         # red
+    'line': (0, 0, 255),          # blue
+    'area': (255, 255, 0),        # yellow
+    'edge': (0, 255, 0)           # green
+}
+
+# 이미지 초기화 텍스트
+TEXT_ORIGINAL_IMAGE_PLACEHOLDER = '원본 이미지\n(이미지를 선택하세요)'
+TEXT_RESULT_IMAGE_PLACEHOLDER = '분석 결과\n(분석을 실행하세요)'
+
 
 class DefectAnalysisGUI:
     """불량 분석 GUI 애플리케이션"""
@@ -132,6 +157,53 @@ class DefectAnalysisGUI:
         # 버튼 스타일
         style.configure('Action.TButton', padding=10, font=('맑은 고딕', 10, 'bold'))
         style.configure('Primary.TButton', padding=8, font=('맑은 고딕', 9))
+    
+    def _add_text_with_font(self, ax, x, y, text, **kwargs):
+        """
+        한글 폰트를 지원하는 텍스트 추가 헬퍼 메서드
+        
+        Args:
+            ax: matplotlib axes 객체
+            x, y: 텍스트 위치
+            text: 표시할 텍스트
+            **kwargs: matplotlib text() 메서드의 추가 인자
+        """
+        if KOREAN_FONT_PROP:
+            kwargs['fontproperties'] = KOREAN_FONT_PROP
+        ax.text(x, y, text, **kwargs)
+    
+    def _set_title_with_font(self, ax, title, **kwargs):
+        """
+        한글 폰트를 지원하는 제목 설정 헬퍼 메서드
+        
+        Args:
+            ax: matplotlib axes 객체
+            title: 제목 텍스트
+            **kwargs: matplotlib set_title() 메서드의 추가 인자
+        """
+        if KOREAN_FONT_PROP:
+            kwargs['fontproperties'] = KOREAN_FONT_PROP
+        ax.set_title(title, **kwargs)
+    
+    def _set_label_with_font(self, ax, label_type, text, **kwargs):
+        """
+        한글 폰트를 지원하는 라벨 설정 헬퍼 메서드
+        
+        Args:
+            ax: matplotlib axes 객체
+            label_type: 'xlabel', 'ylabel', 'title' 중 하나
+            text: 라벨 텍스트
+            **kwargs: matplotlib 라벨 메서드의 추가 인자
+        """
+        if KOREAN_FONT_PROP:
+            kwargs['fontproperties'] = KOREAN_FONT_PROP
+        
+        if label_type == 'xlabel':
+            ax.set_xlabel(text, **kwargs)
+        elif label_type == 'ylabel':
+            ax.set_ylabel(text, **kwargs)
+        elif label_type == 'title':
+            ax.set_title(text, **kwargs)
     
     def create_widgets(self):
         """위젯 생성"""
@@ -511,26 +583,18 @@ class DefectAnalysisGUI:
         
         # 초기 상태 설정
         self.ax_original.axis('off')
-        if KOREAN_FONT_PROP:
-            self.ax_original.text(0.5, 0.5, '원본 이미지\n(이미지를 선택하세요)', 
-                                 ha='center', va='center', fontsize=12, color='gray',
-                                 transform=self.ax_original.transAxes,
-                                 fontproperties=KOREAN_FONT_PROP)
-        else:
-            self.ax_original.text(0.5, 0.5, '원본 이미지\n(이미지를 선택하세요)', 
-                                 ha='center', va='center', fontsize=12, color='gray',
-                                 transform=self.ax_original.transAxes)
+        self._add_text_with_font(
+            self.ax_original, 0.5, 0.5, TEXT_ORIGINAL_IMAGE_PLACEHOLDER,
+            ha='center', va='center', fontsize=12, color='gray',
+            transform=self.ax_original.transAxes
+        )
         
         self.ax_result.axis('off')
-        if KOREAN_FONT_PROP:
-            self.ax_result.text(0.5, 0.5, '분석 결과\n(분석을 실행하세요)', 
-                               ha='center', va='center', fontsize=12, color='gray',
-                               transform=self.ax_result.transAxes,
-                               fontproperties=KOREAN_FONT_PROP)
-        else:
-            self.ax_result.text(0.5, 0.5, '분석 결과\n(분석을 실행하세요)', 
-                               ha='center', va='center', fontsize=12, color='gray',
-                               transform=self.ax_result.transAxes)
+        self._add_text_with_font(
+            self.ax_result, 0.5, 0.5, TEXT_RESULT_IMAGE_PLACEHOLDER,
+            ha='center', va='center', fontsize=12, color='gray',
+            transform=self.ax_result.transAxes
+        )
         
         # Canvas 생성
         self.canvas = FigureCanvasTkAgg(self.fig, master=frame)
@@ -866,23 +930,16 @@ class DefectAnalysisGUI:
             
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             self.ax_original.imshow(image_rgb)
-            if KOREAN_FONT_PROP:
-                self.ax_original.set_title('원본 이미지', fontsize=12, fontweight='bold', fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_original.set_title('원본 이미지', fontsize=12, fontweight='bold')
+            self._set_title_with_font(self.ax_original, '원본 이미지', fontsize=12, fontweight='bold')
             
             # 결과 이미지 영역 초기화 (오른쪽)
             self.ax_result.clear()
             self.ax_result.axis('off')
-            if KOREAN_FONT_PROP:
-                self.ax_result.text(0.5, 0.5, '분석 결과\n(분석을 실행하세요)', 
-                                   ha='center', va='center', fontsize=12, color='gray',
-                                   transform=self.ax_result.transAxes,
-                                   fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_result.text(0.5, 0.5, '분석 결과\n(분석을 실행하세요)', 
-                                   ha='center', va='center', fontsize=12, color='gray',
-                                   transform=self.ax_result.transAxes)
+            self._add_text_with_font(
+                self.ax_result, 0.5, 0.5, TEXT_RESULT_IMAGE_PLACEHOLDER,
+                ha='center', va='center', fontsize=12, color='gray',
+                transform=self.ax_result.transAxes
+            )
             
             self.fig.tight_layout()
             self.canvas.draw()
@@ -895,16 +952,8 @@ class DefectAnalysisGUI:
         if self.current_image is None:
             return
         
-        # 원본 이미지 표시 (왼쪽)
-        self.ax_original.clear()
-        self.ax_original.axis('off')
-        image_rgb = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGB)
-        self.ax_original.imshow(image_rgb)
-        # 한글 폰트 설정 후 제목 표시
-        if KOREAN_FONT_PROP:
-            self.ax_original.set_title('원본 이미지', fontsize=12, fontweight='bold', fontproperties=KOREAN_FONT_PROP)
-        else:
-            self.ax_original.set_title('원본 이미지', fontsize=12, fontweight='bold')
+        # 원본 이미지 렌더링
+        image_rgb = self._render_original_image()
         
         # 분석 결과 이미지 표시 (오른쪽)
         self.ax_result.clear()
@@ -916,90 +965,89 @@ class DefectAnalysisGUI:
             result_image = self.create_highlighted_image(image_rgb, self.current_defects)
             self.ax_result.imshow(result_image)
             
-            # 불량 표시
-            color_map = {
-                'chipping': 'magenta',
-                'crack': 'cyan',
-                'scratch': 'orange',
-                'point': 'red',
-                'line': 'blue',
-                'area': 'yellow',
-                'edge': 'green'
-            }
+            # 불량 그리기 (바운딩 박스, 중심점)
+            self._draw_defects_on_image()
             
-            # 바운딩 박스와 라벨만 표시 (이미지 위에 오버레이)
-            for defect in self.current_defects:
-                x, y, w, h = defect.bbox
-                color = color_map.get(defect.defect_type, 'red')
-                
-                # 바운딩 박스 (얇게, 불량 영역을 가리지 않도록)
-                rect = plt.Rectangle((x, y), w, h, linewidth=2, 
-                                   edgecolor=color, facecolor='none', alpha=0.7)
-                self.ax_result.add_patch(rect)
-                
-                # 중심점 (작게)
-                self.ax_result.plot(defect.centroid[0], defect.centroid[1], 'o', 
-                            color=color, markersize=4, markeredgewidth=1, markeredgecolor='white', alpha=0.8)
-                
-                # 라벨 표시 옵션에 따라 표시
-                if self.show_labels.get():
-                    # 불량명 키 생성 (예: "CHIPPING MINOR", "CRACK MODERATE")
-                    label_key = f"{defect.defect_type.upper()} {defect.severity.upper()}"
-                    
-                    # 해당 불량명의 체크박스 상태 확인
-                    should_show = True
-                    if label_key in self.defect_label_visibility:
-                        should_show = self.defect_label_visibility[label_key].get()
-                    
-                    if should_show:
-                        # 라벨 (작고 간결하게, 바운딩 박스 밖에 표시)
-                        # 불량 영역 위가 아닌 옆이나 아래에 표시
-                        label = f"{defect.defect_type.upper()}\n{defect.severity.upper()}"
-                        # 라벨 위치: 바운딩 박스 오른쪽 상단에 작게 표시
-                        label_x = x + w + 5  # 바운딩 박스 오른쪽에 약간 떨어뜨림
-                        label_y = y  # 상단에 맞춤
-                        
-                        if KOREAN_FONT_PROP:
-                            self.ax_result.text(label_x, label_y, label, 
-                                        color=color, fontsize=7, fontweight='bold',
-                                        ha='left', va='top',
-                                        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7, 
-                                                 edgecolor=color, linewidth=1),
-                                        fontproperties=KOREAN_FONT_PROP)
-                        else:
-                            self.ax_result.text(label_x, label_y, label, 
-                                        color=color, fontsize=7, fontweight='bold',
-                                        ha='left', va='top',
-                                        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7, 
-                                                 edgecolor=color, linewidth=1))
+            # 라벨 표시
+            self._draw_defect_labels()
             
-            if KOREAN_FONT_PROP:
-                self.ax_result.set_title(f'분석 결과 (감지된 불량: {len(self.current_defects)}개)', 
-                                 fontsize=12, fontweight='bold', fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_result.set_title(f'분석 결과 (감지된 불량: {len(self.current_defects)}개)', 
-                                 fontsize=12, fontweight='bold')
+            self._set_title_with_font(
+                self.ax_result, 
+                f'분석 결과 (감지된 불량: {len(self.current_defects)}개)', 
+                fontsize=12, fontweight='bold'
+            )
         else:
             # 불량이 없는 경우 - 원본 이미지 표시
             self.ax_result.imshow(image_rgb)
-            if KOREAN_FONT_PROP:
-                self.ax_result.set_title('분석 결과 (불량 없음)', 
-                                 fontsize=12, fontweight='bold', fontproperties=KOREAN_FONT_PROP)
-                self.ax_result.text(0.5, 0.5, '불량이 감지되지 않았습니다', 
-                                   ha='center', va='center', fontsize=14, color='green',
-                                   transform=self.ax_result.transAxes,
-                                   bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.7),
-                                   fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_result.set_title('분석 결과 (불량 없음)', 
-                                 fontsize=12, fontweight='bold')
-                self.ax_result.text(0.5, 0.5, '불량이 감지되지 않았습니다', 
-                                   ha='center', va='center', fontsize=14, color='green',
-                                   transform=self.ax_result.transAxes,
-                                   bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.7))
+            self._set_title_with_font(
+                self.ax_result, '분석 결과 (불량 없음)', 
+                fontsize=12, fontweight='bold'
+            )
+            self._add_text_with_font(
+                self.ax_result, 0.5, 0.5, '불량이 감지되지 않았습니다',
+                ha='center', va='center', fontsize=14, color='green',
+                transform=self.ax_result.transAxes,
+                bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.7)
+            )
         
         self.fig.tight_layout()
         self.canvas.draw()
+    
+    def _render_original_image(self) -> np.ndarray:
+        """원본 이미지 렌더링"""
+        self.ax_original.clear()
+        self.ax_original.axis('off')
+        image_rgb = cv2.cvtColor(self.current_image, cv2.COLOR_BGR2RGB)
+        self.ax_original.imshow(image_rgb)
+        self._set_title_with_font(self.ax_original, '원본 이미지', fontsize=12, fontweight='bold')
+        return image_rgb
+    
+    def _draw_defects_on_image(self):
+        """불량 그리기 (바운딩 박스, 중심점)"""
+        for defect in self.current_defects:
+            x, y, w, h = defect.bbox
+            color = DEFECT_COLOR_MAP.get(defect.defect_type, 'red')
+            
+            # 바운딩 박스 (얇게, 불량 영역을 가리지 않도록)
+            rect = plt.Rectangle((x, y), w, h, linewidth=2, 
+                               edgecolor=color, facecolor='none', alpha=0.7)
+            self.ax_result.add_patch(rect)
+            
+            # 중심점 (작게)
+            self.ax_result.plot(defect.centroid[0], defect.centroid[1], 'o', 
+                        color=color, markersize=4, markeredgewidth=1, markeredgecolor='white', alpha=0.8)
+    
+    def _draw_defect_labels(self):
+        """불량 라벨 표시"""
+        if not self.show_labels.get():
+            return
+        
+        for defect in self.current_defects:
+            # 불량명 키 생성 (예: "CHIPPING MINOR", "CRACK MODERATE")
+            label_key = f"{defect.defect_type.upper()} {defect.severity.upper()}"
+            
+            # 해당 불량명의 체크박스 상태 확인
+            should_show = True
+            if label_key in self.defect_label_visibility:
+                should_show = self.defect_label_visibility[label_key].get()
+            
+            if should_show:
+                x, y, w, h = defect.bbox
+                color = DEFECT_COLOR_MAP.get(defect.defect_type, 'red')
+                
+                # 라벨 (작고 간결하게, 바운딩 박스 밖에 표시)
+                label = f"{defect.defect_type.upper()}\n{defect.severity.upper()}"
+                # 라벨 위치: 바운딩 박스 오른쪽 상단에 작게 표시
+                label_x = x + w + 5  # 바운딩 박스 오른쪽에 약간 떨어뜨림
+                label_y = y  # 상단에 맞춤
+                
+                self._add_text_with_font(
+                    self.ax_result, label_x, label_y, label,
+                    color=color, fontsize=7, fontweight='bold',
+                    ha='left', va='top',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.7, 
+                             edgecolor=color, linewidth=1)
+                )
     
     def create_highlighted_image(self, image_rgb: np.ndarray, defects: List[Defect]) -> np.ndarray:
         """불량 영역만 강조된 이미지 생성"""
@@ -1028,16 +1076,6 @@ class DefectAnalysisGUI:
         result = np.where(defect_mask_3ch > 0, image_rgb, darkened)
         
         # 불량 영역에 색상 오버레이 추가 (약간의 투명도)
-        color_map_rgb = {
-            'chipping': (255, 0, 255),    # magenta
-            'crack': (0, 255, 255),       # cyan
-            'scratch': (255, 165, 0),     # orange
-            'point': (255, 0, 0),         # red
-            'line': (0, 0, 255),          # blue
-            'area': (255, 255, 0),        # yellow
-            'edge': (0, 255, 0)           # green
-        }
-        
         # 각 불량 영역에 색상 오버레이
         for defect in defects:
             x, y, w, h = defect.bbox
@@ -1046,7 +1084,7 @@ class DefectAnalysisGUI:
             x_end = min(width, x + w + 5)
             y_end = min(height, y + h + 5)
             
-            color = color_map_rgb.get(defect.defect_type, (255, 0, 0))
+            color = DEFECT_COLOR_MAP_RGB.get(defect.defect_type, (255, 0, 0))
             
             # 해당 영역에 색상 오버레이 (20% 투명도)
             overlay = result[y_start:y_end, x_start:x_end].copy()
@@ -1065,13 +1103,11 @@ class DefectAnalysisGUI:
             
             # 차트 초기화
             self.ax_stats.clear()
-            if KOREAN_FONT_PROP:
-                self.ax_stats.text(0.5, 0.5, '불량 없음', ha='center', va='center', 
-                                  fontsize=14, color='green', transform=self.ax_stats.transAxes,
-                                  fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_stats.text(0.5, 0.5, '불량 없음', ha='center', va='center', 
-                                  fontsize=14, color='green', transform=self.ax_stats.transAxes)
+            self._add_text_with_font(
+                self.ax_stats, 0.5, 0.5, '불량 없음',
+                ha='center', va='center', fontsize=14, color='green',
+                transform=self.ax_stats.transAxes
+            )
             self.fig_stats.tight_layout()
             self.canvas_stats.draw()
             return
@@ -1121,14 +1157,9 @@ class DefectAnalysisGUI:
             counts = list(type_counts.values())
             
             self.ax_stats.bar(types, counts, color=['magenta', 'cyan', 'orange', 'purple', 'red', 'blue', 'yellow', 'green'][:len(types)])
-            if KOREAN_FONT_PROP:
-                self.ax_stats.set_xlabel('불량 유형', fontproperties=KOREAN_FONT_PROP)
-                self.ax_stats.set_ylabel('개수', fontproperties=KOREAN_FONT_PROP)
-                self.ax_stats.set_title('불량 유형별 분포', fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_stats.set_xlabel('불량 유형')
-                self.ax_stats.set_ylabel('개수')
-                self.ax_stats.set_title('불량 유형별 분포')
+            self._set_label_with_font(self.ax_stats, 'xlabel', '불량 유형')
+            self._set_label_with_font(self.ax_stats, 'ylabel', '개수')
+            self._set_label_with_font(self.ax_stats, 'title', '불량 유형별 분포')
             self.ax_stats.tick_params(axis='x', rotation=45)
             
             self.fig_stats.tight_layout()
@@ -1212,87 +1243,89 @@ class DefectAnalysisGUI:
         # 확인 대화상자
         if messagebox.askyesno("초기화 확인", "모든 설정과 결과를 초기화하시겠습니까?"):
             # 상태 초기화
-            self.current_image_path = None
-            self.current_defects = None
-            self.current_image = None
-            
-            # 불량명 체크박스 초기화
-            self.defect_label_visibility.clear()
-            if self.defect_label_frame:
-                for widget in self.defect_label_frame.winfo_children():
-                    widget.destroy()
-            if self.label_settings_msg:
-                self.label_settings_msg.config(
-                    text="분석 후 불량명을 선택할 수 있습니다",
-                    foreground="#666666"
-                )
+            self._reset_application_state()
             
             # UI 초기화
-            self.label_image_path.config(
-                text="선택된 파일 없음",
-                foreground="#666666"
-            )
-            
-            # 불량 유형 초기화 (모두 선택 상태로)
-            for key in ['chipping', 'crack', 'scratch']:
-                self.defect_types[key].set(True)
-            
-            # 분석 설정 초기화
-            self.var_min_area.set(10)
-            self.var_max_area.set(100000)
-            self.var_threshold.set('adaptive')
-            
-            # 배치 모드 초기화
-            self.batch_mode.set(False)
-            self.check_batch.config(state='normal')
-            
-            # 버튼 상태 초기화
-            self.btn_analyze.config(state='disabled')
-            self.btn_save.config(state='disabled')
-            
-            # 이미지 영역 초기화
-            self.ax_original.clear()
-            self.ax_original.axis('off')
-            if KOREAN_FONT_PROP:
-                self.ax_original.text(0.5, 0.5, '원본 이미지\n(이미지를 선택하세요)', 
-                                     ha='center', va='center', fontsize=12, color='gray',
-                                     transform=self.ax_original.transAxes,
-                                     fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_original.text(0.5, 0.5, '원본 이미지\n(이미지를 선택하세요)', 
-                                     ha='center', va='center', fontsize=12, color='gray',
-                                     transform=self.ax_original.transAxes)
-            
-            self.ax_result.clear()
-            self.ax_result.axis('off')
-            if KOREAN_FONT_PROP:
-                self.ax_result.text(0.5, 0.5, '분석 결과\n(분석을 실행하세요)', 
-                                   ha='center', va='center', fontsize=12, color='gray',
-                                   transform=self.ax_result.transAxes,
-                                   fontproperties=KOREAN_FONT_PROP)
-            else:
-                self.ax_result.text(0.5, 0.5, '분석 결과\n(분석을 실행하세요)', 
-                                   ha='center', va='center', fontsize=12, color='gray',
-                                   transform=self.ax_result.transAxes)
-            
-            # 통계 초기화
-            self.text_stats.delete(1.0, tk.END)
-            self.text_stats.insert(tk.END, "분석 결과가 여기에 표시됩니다.")
-            
-            # 리포트 초기화
-            self.text_report.delete(1.0, tk.END)
-            self.text_report.insert(tk.END, "분석 리포트가 여기에 표시됩니다.")
-            
-            # 차트 초기화
-            self.ax_stats.clear()
-            self.canvas_stats.draw()
-            
-            # 캔버스 업데이트
-            self.fig.tight_layout()
-            self.canvas.draw()
+            self._reset_application_ui()
             
             # 상태바 업데이트
             self.update_status("초기화 완료. 새로운 분석을 시작하세요.")
+    
+    def _reset_application_state(self):
+        """애플리케이션 상태 초기화"""
+        # 이미지 및 불량 데이터 초기화
+        self.current_image_path = None
+        self.current_defects = None
+        self.current_image = None
+        
+        # 불량명 체크박스 초기화
+        self.defect_label_visibility.clear()
+        if self.defect_label_frame:
+            for widget in self.defect_label_frame.winfo_children():
+                widget.destroy()
+        if self.label_settings_msg:
+            self.label_settings_msg.config(
+                text="분석 후 불량명을 선택할 수 있습니다",
+                foreground="#666666"
+            )
+        
+        # 불량 유형 초기화 (모두 선택 상태로)
+        for key in ['chipping', 'crack', 'scratch']:
+            self.defect_types[key].set(True)
+        
+        # 분석 설정 초기화
+        self.var_min_area.set(10)
+        self.var_max_area.set(100000)
+        self.var_threshold.set('adaptive')
+        
+        # 배치 모드 초기화
+        self.batch_mode.set(False)
+    
+    def _reset_application_ui(self):
+        """애플리케이션 UI 초기화"""
+        # 파일 경로 표시 초기화
+        self.label_image_path.config(
+            text="선택된 파일 없음",
+            foreground="#666666"
+        )
+        self.check_batch.config(state='normal')
+        
+        # 버튼 상태 초기화
+        self.btn_analyze.config(state='disabled')
+        self.btn_save.config(state='disabled')
+        
+        # 이미지 영역 초기화
+        self.ax_original.clear()
+        self.ax_original.axis('off')
+        self._add_text_with_font(
+            self.ax_original, 0.5, 0.5, TEXT_ORIGINAL_IMAGE_PLACEHOLDER,
+            ha='center', va='center', fontsize=12, color='gray',
+            transform=self.ax_original.transAxes
+        )
+        
+        self.ax_result.clear()
+        self.ax_result.axis('off')
+        self._add_text_with_font(
+            self.ax_result, 0.5, 0.5, TEXT_RESULT_IMAGE_PLACEHOLDER,
+            ha='center', va='center', fontsize=12, color='gray',
+            transform=self.ax_result.transAxes
+        )
+        
+        # 통계 초기화
+        self.text_stats.delete(1.0, tk.END)
+        self.text_stats.insert(tk.END, "분석 결과가 여기에 표시됩니다.")
+        
+        # 리포트 초기화
+        self.text_report.delete(1.0, tk.END)
+        self.text_report.insert(tk.END, "분석 리포트가 여기에 표시됩니다.")
+        
+        # 차트 초기화
+        self.ax_stats.clear()
+        self.canvas_stats.draw()
+        
+        # 캔버스 업데이트
+        self.fig.tight_layout()
+        self.canvas.draw()
     
     def update_status(self, message: str):
         """상태바 업데이트"""
